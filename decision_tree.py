@@ -1,10 +1,17 @@
 import numpy as np
 
 
+class TreeNode:
+    def __init__(self, feature=None, prediction=None):
+        self.feature = feature
+        self.children = {}
+        self.prediction = prediction
+
+
 def build_tree(data, target, depth, max_depth, n_features):
     unique_classes = np.unique(target)
     if len(unique_classes) == 1 or depth >= max_depth:
-        return unique_classes[0]
+        return TreeNode(prediction=unique_classes[0])
     selected_features = data.sample(n=n_features, axis=1)
     best_feature = None
     best_criterion = -np.inf
@@ -23,15 +30,14 @@ def build_tree(data, target, depth, max_depth, n_features):
         if criterion > best_criterion:
             best_criterion = criterion
             best_feature = feature
-    tree = {best_feature: {}}
-    best_feature_values = data[best_feature].unique()
-    for value in best_feature_values:
+    tree = TreeNode(feature=best_feature)
+    for value in data[best_feature].unique():
         subset_data = data[data[best_feature] == value]
         subset_target = target[subset_data.index]
         if len(subset_target) == 0:
-            tree[best_feature][value] = np.bincount(target).argmax()
+            tree.children[value] = TreeNode(prediction=np.bincount(target).argmax())
         else:
-            tree[best_feature][value] = build_tree(
+            tree.children[value] = build_tree(
                 subset_data.drop(columns=[best_feature]),
                 subset_target,
                 depth + 1,
@@ -41,13 +47,11 @@ def build_tree(data, target, depth, max_depth, n_features):
     return tree
 
 
-def predict(sample, node, train_target):
-    if not isinstance(node, dict):
-        return node
-    feature = list(node.keys())[0]
-    value = sample[feature]
-    if value in node[feature]:
-        return predict(sample, node[feature][value], train_target)
+def predict(sample, node):
+    if node.prediction is not None:
+        return node.prediction
+    feature_value = sample[node.feature]
+    if feature_value in node.children:
+        return predict(sample, node.children[feature_value])
     else:
-        return np.bincount(
-            train_target).argmax()
+        return np.nan
